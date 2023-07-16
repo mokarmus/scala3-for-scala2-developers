@@ -334,8 +334,9 @@ object typeclass_graduation:
    * 
    * Develop a type class called `EncodeData[A]`, that can encode an `A` into `Data`.
    */
-  trait EncodeData[A]: 
-    extension (value: A) def encode: Data
+  trait EncodeData[-A]: 
+    def encode(value: A): Data
+  
   
   /**
    * 
@@ -346,6 +347,8 @@ object typeclass_graduation:
    */
   object EncodeData {
 
+    extension [A] (value: A)(using encodeData: EncodeData[A]) def encode: Data = encodeData.encode(value)
+
     given EncodeData[Char] = (value: Char) => Primitive[Char](value, PrimType.Char)
     given EncodeData[Byte] = (value: Byte) => Primitive[Byte](value, PrimType.Byte)
     given EncodeData[Short] = (value: Short) => Primitive[Short](value, PrimType.Short)
@@ -354,11 +357,9 @@ object typeclass_graduation:
     given EncodeData[Float] = (value: Float) => Primitive[Float](value, PrimType.Float)
     given EncodeData[Double] = (value: Double) => Primitive[Double](value, PrimType.Double)
     
-    given [A](using EncodeData[A]):  EncodeData[Iterable[A]] =  (list: Iterable[A]) =>
+    given [A](using EncodeData[A]):  EncodeData[Seq[A]] =  (list: Seq[A]) =>
       Data.Collection(list.map(_.encode).toVector)
     
-    //TODO does not work in the person companion object and I how no idea why 
-    given EncodeData[Person] = (p: Person) => Data.Record(Map("name" -> p.name.toVector.encode, "age" -> p.age.encode))
     
   }
 
@@ -369,5 +370,11 @@ object typeclass_graduation:
    */
   final case class Person(name: String, age: Int)
   object Person {
+    import EncodeData.*
     
+    given EncodeData[Person] = (p: Person) => Data.Record(
+      Map(
+        "name" -> p.name.toVector.encode,
+        "age" -> p.age.encode
+      ))
   }
