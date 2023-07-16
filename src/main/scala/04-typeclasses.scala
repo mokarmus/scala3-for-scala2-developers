@@ -1,3 +1,6 @@
+import typeclass_basics.PrettyPrint
+import typeclass_graduation.Data.Primitive
+
 /**
  * TYPECLASSES
  * 
@@ -23,7 +26,8 @@ object typeclass_basics:
    * With the help of the `given` keyword, create an instance of the `PrettyPrint` typeclass for the 
    * data type `Person` that renders the person in a pretty way.
    */
-  // given
+  given PrettyPrint[Person] with
+    extension (person: Person) def prettyPrint: String = s"${person.name} is ${person.age} years old." 
 
   /**
    * EXERCISE 2
@@ -31,21 +35,23 @@ object typeclass_basics:
    * With the help of the `given` keyword, create a **named* instance of the `PrettyPrint` typeclass 
    * for the data type `Int` that renders the integer in a pretty way.
    */
-  // given intPrettyPrint : ...
+  given intPrettyPrint1 : PrettyPrint[Int] with 
+    extension (int: Int) def prettyPrint: String = int.toString
+  
 
   /**
    * EXERCISE 3
    * 
    * Using the `summon` function, summon an instance of `PrettyPrint` for `String`.
    */
-  val stringPrettyPrint: PrettyPrint[String] = ???
+  val stringPrettyPrint: PrettyPrint[String] = summon[PrettyPrint[String]]
 
   /**
    * EXERCISE 4
    * 
    * Using the `summon` function, summon an instance of `PrettyPrint` for `Int`.
    */
-  val intPrettyPrint: PrettyPrint[Int] = ???
+  val intPrettyPrint: PrettyPrint[Int] = summon[PrettyPrint[Int]]
 
   /**
    * EXERCISE 5
@@ -54,7 +60,8 @@ object typeclass_basics:
    * `A` for which a `PrettyPrint` instance exists, can both generate a pretty-print string, and 
    * print it out to the console using `println`.
    */
-  def prettyPrintIt = ???
+  def prettyPrintIt[A](value: A)(using pp: PrettyPrint[A]) =
+    println(value.prettyPrint)
 
   /**
    * EXERCISE 6
@@ -63,7 +70,10 @@ object typeclass_basics:
    * for a generic `List[A]`, given an instance of `PrettyPrint` for the type `A`.
    */
   given [A]: PrettyPrint[List[A]] with
-    extension (a: List[A]) def prettyPrint: String = ???
+    extension (a: List[A]) def prettyPrint: String = {
+      given pp: PrettyPrint[A] = summon[PrettyPrint[A]]
+      a.map(_.prettyPrint).mkString(",")
+    }
 
   /**
    * EXERCISE 7
@@ -71,7 +81,10 @@ object typeclass_basics:
    * With the help of both `given` and `using`, create a **named** instance of the `PrettyPrint` 
    * type class for a generic `Vector[A]`, given an instance of `PrettyPrint` for the type `A`.
    */
-  // given vectorPrettyPrint[A] : ...
+  given vectorPrettyPrint[A: PrettyPrint] : PrettyPrint[Vector[A]] with 
+    extension (vector: Vector[A]) def prettyPrint: String =
+      given pp: PrettyPrint[A] = summon[PrettyPrint[A]]
+      vector.map(_.prettyPrint).mkString(",")
 
   import scala.CanEqual.*
 
@@ -91,16 +104,19 @@ object given_scopes:
      * 
      * Import the right given into the scope (but ONLY this given) so the following code will compile.
      */
-    // 12.hash 
+     import Hash.given_Hash_Int
+     12.hash 
 
     /**
      * EXERCISE 2
      * 
      * Import the right given into the scope (but ONLY this given) so the following code will compile.
      */
-    // 12.123.hash   
+     import Hash.given_Hash_Double
+     12.123.hash   
   }
-
+  
+  
   object more_typeclasses:
     /**
      * EXERCISE 1
@@ -109,7 +125,9 @@ object given_scopes:
      * a finite number of values. One way to do this is to add a single operation called 
      * `enumerate` that returns a `List[A]`.
      */
-    trait Enumerable[A]
+    trait Enumerable[A] {
+      def enumerate: List[A]
+    }
 
     object Enumerable:
       /**
@@ -118,7 +136,7 @@ object given_scopes:
        * Define an instance of the typeclass Enumerable for `Boolean`.
        */
       given Enumerable[Boolean] with
-        def dummy = 1
+        override def enumerate: List[Boolean] = List(true, false)
 
       /**
        * EXERCISE 3
@@ -127,8 +145,9 @@ object given_scopes:
        * With `using`, this relationship can be captured precisely. Define an `Enumerable` instance
        * for `Option[A]` given an instance for `A`.
        */
-      given [A](using Enumerable[A]): Enumerable[Option[A]] with 
-        def dummy = 1
+      given [A](using enumerableA: Enumerable[A]): Enumerable[Option[A]] with
+        override def enumerate: List[Option[A]] =
+          None :: enumerableA.enumerate.map(Some(_))
 
     end Enumerable
 
@@ -138,7 +157,7 @@ object given_scopes:
      * By adding a `using`, implement this polymorphic function to return the "first" enumerable
      * value.
      */
-    def first[A]: A = ???
+    def first[A](using enumerable: Enumerable[A]): A = enumerable.enumerate.head 
 
     /**
      * EXERCISE 5
@@ -146,7 +165,7 @@ object given_scopes:
      * By adding a `using`, implement this polymorphic function to return the "last" enumerable
      * value.
      */
-    def last[A]: A = ???
+    def last[A: Enumerable]: A = summon[Enumerable[A]].enumerate.last
 
     /**
      * EXERCISE 6
@@ -154,7 +173,8 @@ object given_scopes:
      * By adding a `using`, implement this polymorphic function to return the "ordinal" of the 
      * specified enumerable value.
      */
-    def ordinalOf[A](value: A): Int = ???
+    def ordinalOf[A](value: A)(using enumerable: Enumerable[A]): Int =
+      enumerable.enumerate.indexOf(value)
 
     /**
      * EXERCISE 7
@@ -162,8 +182,7 @@ object given_scopes:
      * Make an extension method called `ordinal` that is added to any data type that has an 
      * `Enumerable` instance. You will have to use `using`.
      */
-    // extension [A](value: A)(using ...)
-    type Dummy
+    extension [A](value: A)(using enumerable: Enumerable[A]) def ordinal = enumerable.enumerate.indexOf(value)
 
     /**
      * EXERCISE 8
@@ -175,7 +194,7 @@ object given_scopes:
      * Define a `Show` for `Email` by using a given alias and the `contramap` function on 
      * the `Show` instance for `String`.
      */
-    // given Show[Email] = ...
+    given Show[Email] = summon[Show[String]].contramap(_.value)
 
     trait Show[-A]: 
       self =>
@@ -195,8 +214,9 @@ object given_scopes:
      * You can introduce givens inside patterns. These are called "pattern-bound" given instances.
      * Using some example of destructuring assignment, introduce a given with a pattern.
      */
+    //Not sure what should be a result here 
     Some(summon[Show[String]]) match 
-      case Some(given Show[String]) => ???
+      case Some(s @ given Show[String]) => s.show("value")
 
     /**
      * EXERCISE 10
@@ -208,29 +228,29 @@ object given_scopes:
      * a given instance of `Show` for `A`.
      */
     import scala.util.NotGiven 
-    // given [A](using ...): Show[List[A]] = ???
-
+    given [A](using NotGiven[Show[A]]): Show[List[A]] = (value: List[A]) => value.mkString(",")
+    
 
     /**
      * EXERCISE 11
      * 
      * Adding the right `using` clause to this function so that it compiles.
      */
-    def hashing[T](value: T) = ??? // value.hash 
+    def hashing[T](value: T)(using Hash[T]) = value.hash 
 
     /**
      * EXERCISE 12
      * 
      * Adding the right `using` clause to this function so that it compiles.
      */
-    def hashingDoubles = ??? // 12.123.hash   
+    def hashingDoubles(using Hash[Double]) = 12.123.hash   
 
     /**
      * EXERCISE 13
      * 
      * Intersperse normal parameters with their `using Hash[X]` for those parameters.
      */
-    def intersperse[A, B, C, D] = ???
+    def intersperse[A: Hash, B: Hash, C: Hash, D: Hash] = ???
   
 object typeclass_derives:
   /**
@@ -244,13 +264,16 @@ object typeclass_derives:
     case Green 
     case Blue
 
+  given CanEqual[Color, Color] = CanEqual.derived
+  
+  
   /**
    * EXERCISE 2
    * 
    * Using the `derives` clause, derive an instance of the type class `CanEqual` for 
    * `Person`.
    */
-  final case class Person(name: String, age: Int)
+  final case class Person(name: String, age: Int) derives CanEqual
 
 /**
  * IMPLICIT CONVERSIONS
@@ -267,16 +290,17 @@ object conversions:
    * Create an instance of the type class `Conversion` for the combination of types
    * `Rational` (from) and `Double` (to).
    */
-  // given ...
-  given Conversion[Rational, Double] = ???
+  given Conversion[Rational, Double] = (r: Rational) => r.n.toDouble / r.d
 
+  import scala.language.implicitConversions
+  
   /**
    * EXERCISE 2
    * 
    * Multiply a rational number by 2.0 (a double) to verify your automatic
    * conversion works as intended.
    */
-  Rational(1, 2)
+  Rational(1, 2) * 2.0
 
 object typeclass_graduation:
   /**
@@ -285,7 +309,13 @@ object typeclass_graduation:
    * Add cases to this enum for every primitive type in Scala.
    */
   enum PrimType[A]:
+    case Char extends PrimType[Char]
+    case Byte extends PrimType[Byte]
+    case Short extends PrimType[Short]
     case Int extends PrimType[Int]
+    case Long extends PrimType[Long]
+    case Float extends PrimType[Float]
+    case Double extends PrimType[Double]
   
   /**
    * EXERCISE 2
@@ -296,21 +326,41 @@ object typeclass_graduation:
     case Record(fields: Map[String, Data])
     case Primitive[A](primitive: A, primType: PrimType[A])
     case Collection(elements: Vector[Data])
+    case Enumerations[A](instance: A)
+    
 
   /**
    * EXERCISE 3
    * 
    * Develop a type class called `EncodeData[A]`, that can encode an `A` into `Data`.
    */
-  trait EncodeData[A]
-
+  trait EncodeData[A]: 
+    extension (value: A) def encode: Data
+  
   /**
+   * 
    * EXERCISE 4
    * 
    * In the companion object of `Data`, write encoders for different primitive types in Scala,
    * including lists and collections.
    */
-  object EncodeData
+  object EncodeData {
+
+    given EncodeData[Char] = (value: Char) => Primitive[Char](value, PrimType.Char)
+    given EncodeData[Byte] = (value: Byte) => Primitive[Byte](value, PrimType.Byte)
+    given EncodeData[Short] = (value: Short) => Primitive[Short](value, PrimType.Short)
+    given EncodeData[Int] = (value: Int) => Primitive[Int](value, PrimType.Int)
+    given EncodeData[Long] = (value: Long) => Primitive[Long](value, PrimType.Long)
+    given EncodeData[Float] = (value: Float) => Primitive[Float](value, PrimType.Float)
+    given EncodeData[Double] = (value: Double) => Primitive[Double](value, PrimType.Double)
+    
+    given [A](using EncodeData[A]):  EncodeData[Iterable[A]] =  (list: Iterable[A]) =>
+      Data.Collection(list.map(_.encode).toVector)
+    
+    //TODO does not work in the person companion object and I how no idea why 
+    given EncodeData[Person] = (p: Person) => Data.Record(Map("name" -> p.name.toVector.encode, "age" -> p.age.encode))
+    
+  }
 
   /**
    * EXERCISE 5
@@ -318,4 +368,6 @@ object typeclass_graduation:
    * Create an instance of `EncodeData` for `Person`.
    */
   final case class Person(name: String, age: Int)
-  object Person
+  object Person {
+    
+  }
