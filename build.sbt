@@ -10,8 +10,8 @@ lazy val root = project
       "-language:postfixOps",
       "-Ykind-projector",
       "-Yexplicit-nulls",
-      "-source", "future",
-      "-Xfatal-warnings"
+      //"-source", "future",
+      "-Xfatal-warnings",
     ),
     scalaVersion := "3.0.0"
   )

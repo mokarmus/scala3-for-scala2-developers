@@ -38,7 +38,7 @@ object intersection_types:
    * Form the intersection of the types `HasLogging` and `HasUserRepo` by using the type 
    * intersection operator `&`.
    */
-  type HasLoggingAndUserRepo
+  type HasLoggingAndUserRepo = HasLogging & HasUserRepo
 
   /**
    * EXERCISE 2
@@ -46,9 +46,8 @@ object intersection_types:
    * Using the `IsEqual` helper method, test to see if the type `HasLogging & HasUserRepo` is the 
    * same as the type `HasUserRepo & HasLogging`.
    */
-  // IsEqual ...
-
   def IsEqual[A, B](using ev: A =:= B) = ()
+  IsEqual[HasLogging & HasUserRepo, HasUserRepo & HasLogging]
 
   /**
    * EXERCISE 3
@@ -57,7 +56,9 @@ object intersection_types:
    * 
    * Create class that has the type `HasUserRepo & HasLogging`.
    */
-  class BothUserRepoAndLogging
+  class BothUserRepoAndLogging extends HasUserRepo with HasLogging:
+    override def userRepo: UserRepo = ???
+    override def logging: Logging = ???
 
 /**
  * UNION TYPES
@@ -84,7 +85,7 @@ object union_types:
    * Form the union of the types `PaymentDenied` and `MissingAddress` using the type union 
    * operator `|`.
    */
-  type PaymentDeniedOrMissingAddress
+  type PaymentDeniedOrMissingAddress = PaymentDenied | MissingAddress
 
   /**
    * EXERCISE 2
@@ -92,7 +93,7 @@ object union_types:
    * Create a value of type `PaymentDeniedOrMissingAddress` by assigning the following variable to 
    * a `PaymentDenied` error.
    */
-  val example1: PaymentDeniedOrMissingAddress = ???
+  val example1: PaymentDeniedOrMissingAddress = PaymentDenied("Payment denied")
 
   /**
    * EXERCISE 3
@@ -100,7 +101,7 @@ object union_types:
    * Create a value of type `PaymentDeniedOrMissingAddress` by assigning the following variable to 
    * a `MissingAddress` error.
    */
-  val example2: PaymentDeniedOrMissingAddress = ???
+  val example2: PaymentDeniedOrMissingAddress = MissingAddress("Missing address")
 
   /**
    * EXERCISE 4
@@ -108,7 +109,9 @@ object union_types:
    * Perform a pattern match on `example2`, covering each possibility and printing out the 
    * error messages to the console.
    */
-  // example2 match 
+   example2 match
+     case MissingAddress(message) => println(s"Missing message $message")
+     case PaymentDenied(message) => println(s"Payment denied $message")
 
   /**
    * EXERCISE 5
@@ -116,7 +119,10 @@ object union_types:
    * Try to pattern match on `SomeList` and handle both cases. Explain 
    * your findings and what this implies about union types.
    */
-  def whatList(l: SomeList) = ???
+  def whatList(l: SomeList) = l match
+    case List("ds") => println("The list of strings")
+    case List(1) => println("The list of ints")
+    case _ => println("other")
 
   type SomeList = List[String] | List[Int]
 
@@ -139,21 +145,21 @@ object match_types:
    * 
    * Construct a value of the appropriate type, which is computed using the match type `Combine`.
    */
-  val unitAndString: Combine[Unit, String] = ???
+  val unitAndString: Combine[Unit, String] = "string"
 
   /**
    * EXERCISE 2
    * 
    * Construct a value of the appropriate type, which is computed using the match type `Combine`.
    */
-  val stringAndUnit: Combine[String, Unit] = ???
+  val stringAndUnit: Combine[String, Unit] = "string"
 
   /**
    * EXERCISE 3
    * 
    * Construct a value of the appropriate type, which is computed using the match type `Combine`.
    */
-  val stringAndString: Combine[String, String] = ???
+  val stringAndString: Combine[String, String] = ("string1", "string2")
 
   /**
    * EXERCISE 4
@@ -165,7 +171,10 @@ object match_types:
    * Create a match type that will return Scala's `Vector` for all types except primitive types,
    * but for primitive types, will return Scala's `Array`.
    */
-  type Collection[X]
+  type Collection[X] = X match {
+    case Byte | Short | Char | Int | Long | Double | Float => Array[X]
+    case ? => Vector[X]
+  }
 
   /**
    * EXERCISE 5
@@ -186,15 +195,21 @@ object match_types:
    * `head` function which returns the head of the specified value (a character of a string, 
    * or the first element of an array or iterable, or the passed in value, otherwise).
    */
-  def headOf[X](x: X): ElementType[X] = ???
-
+  def headOf[X](x: X): ElementType[X] = x match
+    case string: String => string.charAt(0)
+    case array: Array[t] => headOf(array(0))
+    case iterable: Iterable[t] => headOf(iterable.head)
+    case x: AnyVal => x
+    
   /**
    * EXERCISE 7
    * 
    * Match types don't have to define "total" functions. Try to construct a value of the type 
    * `Partial[Int]`.
    */
+  //Well, I think it is not possible to be created?
   def partialInt: Partial[Int] = ???
+  
   type Partial[X] = 
     X match
       case String => Float 
@@ -218,7 +233,7 @@ object opaque_types:
        * The scope of an opaque type has special privileges. Create a constructor for email that
        * takes a string, and returns an `Email`.
        */
-      def apply() = ???
+      def apply(string: String): Email = string 
     end Email
 
     /**
@@ -227,7 +242,7 @@ object opaque_types:
      * Define an extension method to retrieve the username of an email (the part before the '@' 
      * character).
      */
-    extension (e: Email) def username: String = ???
+    extension (e: Email) def username: String = e.split('@').head
   end email_example
 
   import email_example.*
@@ -237,15 +252,14 @@ object opaque_types:
    * 
    * Use the constructor you made to build an `Email` value given a `String`.
    */
-  lazy val exampleEmail: Email = ???
+  lazy val exampleEmail: Email = Email("mark.ronson@gmail.com")
 
   /**
    * EXERCISE 4
    * 
    * Try to pass the email you constructed to the function `printString` and note your findings.
    */
-  printString(???)
-
+  //printString(exampleEmail)
   def printString(string: String): Unit = println(string)
 
   object natural_example:
@@ -256,7 +270,7 @@ object opaque_types:
      * relationship must be true and it will be "exported" outside the scope in which the opaque
      * type is defined.
      */
-    opaque type Natural = Int
+    opaque type Natural <: AnyVal = Int
 
     object Natural:
       /**
@@ -265,7 +279,7 @@ object opaque_types:
        * Define a smart constructor that, given an `Int`, may or may not return a `Natural`, 
        * depending on whether the number is a natural number (non-negative) or not.
        */
-      def fromInt(i: Int): Option[Natural] = ???
+      def fromInt(i: Int): Option[Natural] = if i < 0 then None else Some(i)
     end Natural
   end natural_example
 
@@ -277,16 +291,16 @@ object opaque_types:
    * Construct an example natural number from the number 5, and call `get` on the `Option` because
    * you know it is a natural number.
    */
-  lazy val exampleNatural: Natural = ???
+  lazy val exampleNatural: Natural = Natural.fromInt(5).get
 
   /**
    * EXERCISE 8
    * 
    * Try to pass the natural number to the function `printInt` and note your findings.
    */
-  printInt(???)
+  printInt(exampleNatural)
 
-  def printInt(v: Int): Unit = println(v.toString())
+  def printInt(natural: Natural): Unit = println(natural.toString())
 
 /**
  * POLYMORPHIC FUNCTION TYPES
@@ -303,7 +317,7 @@ object polymorphic_functions:
    * 
    * Define a polymorphic function `firstFn` that does exactly what the method `firstMethod` does.
    */
-  lazy val firstFn = ???
+  lazy val firstFn: [X, Y] => ((X, Y)) => X = [A, B] => (tuple: (A, B)) => tuple._1
   def firstMethod[A, B](tuple: (A, B)): A = tuple._1
 
   /**
@@ -311,7 +325,7 @@ object polymorphic_functions:
    * 
    * Define a polymorphic function `secondFn` that does exactly what the method `secondMethod` does.
    */
-  lazy val secondFn = ???
+  lazy val secondFn = [A, B] => (tuple: (A, B)) => tuple._2
   def secondMethod[A, B](tuple: (A, B)): B = tuple._2
 
 /**
@@ -331,7 +345,7 @@ object dependent_functions:
    * 
    * Explicitly provide a type signature for `getFn`.
    */
-  lazy val getFn = (e: Entry) => getMethod(e)
+  lazy val getFn: Entry => Entry#Out = (e: Entry) => getMethod(e)
 
   trait Combine[L, R]:
     type Out
@@ -344,7 +358,9 @@ object dependent_functions:
    * Define a polymorphic function `combineFn` that does exactly what the method 
    * `combineMethod` does.
    */
-  lazy val combineFn = ???
+  lazy val combineFn: [L,R] => (L, R, Combine[L,R]) => Combine[L, R]#Out =
+   [L ,R] => (l: L, r: R, c: Combine[L ,R]) => c.combine(l, r) 
+     
   def combineMethod[L, R](l: L, r: R, c: Combine[L, R]): c.Out = c.combine(l, r)
 
 /**
@@ -368,7 +384,8 @@ object type_lambdas:
    * Define a `Sizable` for `Map` for the given key type `K`. You will have to 
    * use a type lambda.
    */
-  def sizableMap[K] = ???
+  def sizableMap[K] = new Sizable[MapK[K]]:
+    def size[V](map: Map[K, V]): Int = map.size 
 
   /**
    * EXERCISE 2
@@ -377,14 +394,14 @@ object type_lambdas:
    * returns another type constructor that merely flips the order of type parameters to the first 
    * type constructor.
    */
-  type Flip[F[_, _]]
+  type Flip[F[_, _]] = [A, B] =>> F[B, A]
 
   /**
    * EXERCISE 3
    * 
    * Use the `Flip` type constructor you defined to flip the order of type parameters to `Map`.
    */
-  type FlippedMap[K, V]
+  type FlippedMap[K, V] = Map[V, K]
 
   /**
    * EXERCISE 4
@@ -394,7 +411,7 @@ object type_lambdas:
    * constructor which takes one type parameter, returning the type constructed by the original 
    * type constructor, fully applied with both type parameters.
    */
-  type Curry[F[_, _]]
+  type Curry[F[_, _]] = [A] =>> [B] =>> F[A, B]
 
   // Not supported... 
   // type Uncurry[F[_][_]] = [A, B] =>> F[A][B]
@@ -406,7 +423,7 @@ object type_lambdas:
    * syntax. Partially apply `Map` to the key type parameter with `K`, using the 
    * placeholder `*` for the value type parameter.
    */
-  // def sizableMap2[K] = sizableMap[K]
+   def sizableMap2[*] = sizableMap[*]
 
 
 /**
@@ -414,9 +431,11 @@ object type_lambdas:
  * 
  * Scala 3 introduces context functions, which are functions that depend on some context.
  */
+
 object context_functions:
   trait Program:
     def addOp(op: Op): Unit 
+    
   object Program:
     def make(): Program = 
       var ops = List.empty[Op]
@@ -457,14 +476,22 @@ object context_functions:
    * which use context functions to pass around a string builder that is used for printing the 
    * HTML fragments.
    */
-  def text(string: String): HTML[Unit] = ???
-  def p[A](inner: HTML[A]): HTML[A] = ???
+  
+  def text(string: String)(using stringBuilder: StringBuilder): HTML[Unit] = 
+    stringBuilder.append(s"<text>$string</text>") 
+  
+  
+  def p[A](inner: HTML[A])(using stringBuilder: StringBuilder): HTML[A] = {
+    stringBuilder.append("<p>")
+    val innerResult = inner
+    stringBuilder.append("</p>")
+    innerResult
+  }
 
   type HTML[+A] = StringBuilder ?=> A
 
   def makeHtml[A](html: HTML[A]): A = {
     given StringBuilder = new StringBuilder()
-
     html
   }
 
@@ -485,8 +512,10 @@ object context_functions:
    */
   def permutation1: HTML[Task[Unit]] = ???
   def permutation2: Task[HTML[Unit]] = ???
+  
   def acceptsPermutation1(p: HTML[Task[Unit]]): Unit = () 
-  acceptsPermutation1(???)
+  acceptsPermutation1(permutation1)
+  acceptsPermutation1(permutation2)
 
   /**
    * EXERCISE 3
@@ -494,7 +523,9 @@ object context_functions:
    * Unlike contravariant reader effects (e.g. environment in ZIO), context functions do not infer.
    * Add type ascriptions to make this code compile.
    */
-  // def composed = compose(task, html)
+  
+  
+   def composed: ExecutionContext ?=> StringBuilder ?=> (String, Int) = compose(task, html)
 
   def compose[A, B, C, D](left: A ?=> B, right: C ?=> D): A ?=> C ?=> (B, D) = 
     (left, right)
@@ -516,7 +547,7 @@ object singleton_types:
    * 
    * Explicitly ascribe this literal value a singleton type.
    */
-  val trueValue = true
+  val trueValue: true = true
 
   /**
    * EXERCISE 2
@@ -524,21 +555,23 @@ object singleton_types:
    * Test to see if `true` is a subtype of `Boolean` by using the helper type function 
    * `IsSubtypeOf`.
    */
-  type trueSubtypeBoolean
+  type trueSubtypeBoolean = IsSubtypeOf[trueValue.type , Boolean]
 
   /**
    * EXERCISE 3
    * 
    * Explicitly ascribe this literal value a singleton type.
    */
-  val stringValue = "name"
+  val stringValue: "name" = "name"
 
+  //val surnameValue: "surname" = stringValue
+  
   /**
    * EXERCISE 4
    * 
    * Explicitly ascribe this literal value a singleton type.
    */
-  val floatValue = 3.1415f  
+  val floatValue: 3.20 = 3.1415f  
 
   infix type IsSubtypeOf[A, B >: A]
 
@@ -553,5 +586,5 @@ object transparent_traits:
    * 
    * Mark the following trait as transparent by using the `transparent` keyword.
    */
-  trait KryoSerialize
+  transparent trait KryoSerialize
 
