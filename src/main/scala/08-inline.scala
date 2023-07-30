@@ -1,3 +1,5 @@
+import scala.collection.mutable
+import scala.compiletime.ops.int.S
 import scala.language.implicitConversions
 
 /**
@@ -15,7 +17,7 @@ object inline_basics:
    * Guarantee the Scala compiler will inline the following constant by using the `inline` keyword.
    * Then explicitly ascribe a type and note your findings.
    */
-  val LoggingEnabled = false 
+  inline val LoggingEnabled: false = false 
 
   /**
    * EXERCISE 2
@@ -23,7 +25,7 @@ object inline_basics:
    * Guarantee the Scala compiler will inline the following method anywhere it is applied, by using 
    * the `inline` keyword.
    */
-  def log(line: => String): Unit = 
+  inline def log(line: => String): Unit = 
     if (LoggingEnabled) println(line)
 
   /**
@@ -31,7 +33,8 @@ object inline_basics:
    * 
    * Simplify the following expression as the Scala compiler would simplify it.
    */
-  val _ = log("This is a test!")
+  //Not sure about it 
+  val _ = ()
 
 object inline_recursion:
   /**
@@ -40,21 +43,26 @@ object inline_recursion:
    * Using recursion, implement the power function, which raises the specified number to the 
    * specified integral power.
    */
-  inline def pow(num: Float, exp: Int): Float = ???
+  inline transparent def pow(num: Float, exp: Int): Float =
+    if (exp == 0) 1
+    else if (exp == 1) num
+    else num * pow(num, exp - 1)
+    
   /**
    * EXERCISE 2
    * 
    * Compute the power of 10.5 raised to the power of 3.
    */
-  def `10.5 ^ 3` = ???
+  def `10.5 ^ 3` = pow(10.5, 3)
 
   /**
    * EXERCISE 3
    * 
    * Try to compute the power of 10.5 raised to the power of 100 and note what happens.
    */
-  def `10.5 ^ 100` = ???
-
+  //Very long compilation time of out of memory
+ // def `10.5 ^ 100` = pow(10.5, 100)
+  
 object inline_transparent:
   final case class Natural(value: Int)
   object Natural:
@@ -64,7 +72,7 @@ object inline_transparent:
       * Apply the `transparent` modifier to this use of `inline` so the specific subtype of the 
       * return value will be reflected at the application site at compile-time.
       */
-    inline def apply(v: Int): Option[Natural] = 
+    inline transparent def apply(v: Int): Option[Natural] = 
       if (v >= 0) Some(new Natural(v)) else None
 
     def fromInt(v: Int): Option[Natural] = apply(v)
@@ -75,14 +83,15 @@ object inline_transparent:
    * 
    * Define an implicit conversion from `Some[Natural]` to `Natural`.
    */
-  given Conversion[Some[Natural], Natural] = ???
+  given Conversion[Some[Natural], Natural] = _.getOrElse(Natural(0))
 
   /**
    * EXERCISE 3
    * 
    * Change the type of `zero` to `Natural`, and explain why this does or does not compile.
    */
-  val zero: Option[Natural] = Natural(0)
+  //Cause the type is determined at compile time
+  val zero: Natural = Natural(0)
 
 object inline_conditional:
   import scala.compiletime.*
@@ -95,11 +104,16 @@ object inline_conditional:
       * Apply the `inline` modifier to the conditional to guarantee the branch can be determined at 
       * compile time.
       */
+     //not sure why this conversion has to be added
+    given Conversion[Some[Natural], Natural] = _.getOrElse(Natural(0))
+     
     transparent inline def apply(v: Int): Any = 
       inline if (v >= 0) new Natural(v) else error("Not a natural number")
 
-    def fromInt(v: Int): Option[Natural] = 
-      if (v >= 0) Some(new Natural(v)) else None
+    transparent inline def fromInt(v: Int): Option[Natural] = 
+      inline if (v >= 0) Some(new Natural(v)) else None
+      
+
   end Natural
 
   /**
@@ -107,15 +121,15 @@ object inline_conditional:
    * 
    * Create a natural number from an integer literal.
    */
-  def natural: Natural = ???
+  def natural: Natural = Natural.fromInt(12)
 
   /**
    * EXERCISE 3
    * 
    * Try to create a natural number from `fortyTwo`.
    */
-  def naturalFortyTwo: Natural = ???
-  val fortyTwo: Int = 42
+  inline val fortyTwo: 42 = 42
+  def naturalFortyTwo: Natural = Natural.fromInt(fortyTwo)
 
 object inline_match:
   sealed trait Natural
@@ -128,7 +142,11 @@ object inline_match:
    * Using an inline match and recursion, implement the following function, which converts a Natural
    * number into an integer.
    */
-  transparent inline def toInt(n: Natural): Int = ???
+
+  transparent inline def toInt(n: Natural): Int = inline n match
+    case Zero => 0
+    case Succ(value) => 1 + toInt(value)
+
 
   /**
    * EXERCISE 2
@@ -136,9 +154,9 @@ object inline_match:
    * Use the `toInt` function to convert `two` into an int. Ascribe it the most precise type you 
    * can.
    */
-  final val twoToInt = ???
-
   def two: Succ[Succ[Zero.type]] = Succ(Succ(Zero))
+  
+  final val twoToInt: 2 = toInt(two)
 
 object compiletime:
   import scala.compiletime.*
@@ -150,7 +168,7 @@ object compiletime:
    * 
    * Hint: You will have to mark `succ` as inline to call this function.
    */
-  def succ[N <: Int]: Int = ???
+  transparent inline def succ[N <: Int]: Int = constValue[N] + 1
 
   /**
    * EXERCISE 2
@@ -158,7 +176,7 @@ object compiletime:
    * Call the function `succ` on the type `3`. Make any changes to `succ` that are necessary to 
    * type the result of `succ[3]` as `4`.
    */
-  def four = ???
+  def four: 4 = succ[3]
 
   /**
    * EXERCISE 3
@@ -167,31 +185,47 @@ object compiletime:
    * should return a `Some(n)` if the specified type is a singleton integer, and `None` 
    * otherwise.
    */
-  inline def natural[A]: Option[Int] = ???
+    
+    inline def natural[A]: Option[Int] = inline constValueOpt[A] match
+      case Some(value : Int) => Some(value)
+      case _ => None
 
-  /**
-   * EXERCISE 4
-   * 
-   * Using inline match and the type-level function `S[N]`, which returns the successor type of the 
-   * singleton type `N`, implement the following function, which "counts" `N`.
-   */
-  transparent inline def count[N]: Int =
-    ??? // inline constValue[N] match
+      /**
+       * EXERCISE 4
+       *
+       * Using inline match and the type-level function `S[N]`, which returns the successor type of the 
+       * singleton type `N`, implement the following function, which "counts" `N`.
+       */
+      //Not sure if that is correct
+      transparent inline def count[N]: Int = inline constValue[N] match
+        case 0 => 0
+        case x: S[n1] => 1 + count[n1]
 
-  /**
-   * EXERCISE 5
-   * 
-   * Using `erasedValue` match against the runtime type of a value so you can return a default value
-   * of that type.
-   */
-  inline def defaultValue[A]: Option[A] = ???
+      /**
+       * EXERCISE 5
+       *
+       * Using `erasedValue` match against the runtime type of a value so you can return a default value
+       * of that type.
+       */
+      transparent inline def defaultValue[T] =
+        inline erasedValue[T] match
+          case _: Byte    => Some(0: Byte)
+          case _: Char    => Some(0: Char)
+          case _: Short   => Some(0: Short)
+          case _: Int     => Some(0)
+          case _: Long    => Some(0L)
+          case _: Float   => Some(0.0f)
+          case _: Double  => Some(0.0d)
+          case _: Boolean => Some(false)
+          case _: Unit    => Some(())
+          case _          => None
 
-  /**
-   * EXERCISE 6
-   * 
-   * Using `error`, produce a compile-time failure if the provided number is less than 0.
-   */
-  inline def assertNatural(n: Int): Unit = ???
+      /**
+       * EXERCISE 6
+       *
+       * Using `error`, produce a compile-time failure if the provided number is less than 0.
+       */
+      inline def assertNatural(n: Int): Unit = if (n < 0) error(s"$n is not natural")
 
 object selective_summon:
   import scala.compiletime.summonFrom
@@ -202,7 +236,12 @@ object selective_summon:
    * Using `summonFrom`, create a function that makes a set for the provided type: if the type has 
    * an ordering, then use `TreeSet`, otherwise, use `HashSet`.
    */
-  inline def setFor[T]: Set[T] = ???
+  import scala.collection.immutable.TreeSet
+  import scala.collection.immutable.HashSet
+  inline def setFor[T]: Set[T] = summonFrom {
+    case ord: Ordering[T] => new TreeSet[T]()(using ord)
+    case _                => new HashSet[T]
+  }
 
 object inline_params:
   inline val LoggingLevel = 1
@@ -213,5 +252,5 @@ object inline_params:
    * Use inline parameters to ensure the following has no runtime overhead
    * unless logging is enabled.
    */
-  def log(level: Int, line: String): Unit = 
-    if (level >= LoggingLevel) println(line)
+  inline def log(level: Int, line: String): Unit = 
+    inline if (level >= LoggingLevel) println(line)
