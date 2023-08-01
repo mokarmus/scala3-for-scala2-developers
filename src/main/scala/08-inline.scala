@@ -199,7 +199,7 @@ object compiletime:
       //Not sure if that is correct
       transparent inline def count[N]: Int = inline constValue[N] match
         case 0 => 0
-        case x: S[n1] => 1 + count[n1]
+        case _: S[n1] => 1 + count[n1]
 
       /**
        * EXERCISE 5
