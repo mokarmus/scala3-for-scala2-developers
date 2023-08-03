@@ -19,6 +19,7 @@ object typeclass_deriving:
       elem.asInstanceOf[Show[Any]].show(x)
 
     def iterator[A](p: A) = p.asInstanceOf[Product].productIterator
+    
     def showSum[A](s: Mirror.SumOf[A], elems: => List[Show[?]]): Show[A] =
       (x: A) => showElem(elems(s.ordinal(x)))(x)
 
