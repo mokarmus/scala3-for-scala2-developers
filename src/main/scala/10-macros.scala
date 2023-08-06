@@ -1,3 +1,5 @@
+package macros
+
 import scala.quoted.*
 
 /**
@@ -5,7 +7,7 @@ import scala.quoted.*
  * 
  * Scala 3 introduces statically-typed, hygienic macros. 
  */
-object macro_basics:
+object MacroBasics:
   inline def assert(inline expr: Boolean): Unit =
     ${assertImpl('expr)}
 
@@ -26,14 +28,14 @@ object macro_basics:
    * 
    * Construct an `Expr[Int]` by using the `Expr.apply` constructor on an int literal.
    */
-  def exprInt: Expr[Int] = ???
+  inline def exprInt(inline int: Int)(using Quotes): Expr[Int] = Expr.apply(int)
 
   /**
    * EXERCISE 2
    * 
    * Construct an `Expr[String]` by using the `Expr.apply` constructor on a string literal.
    */
-  def exprString: Expr[String] = ???
+  def exprString(string: String)(using Quotes): Expr[String] = Expr.apply(string)
 
   /**
    * EXERCISE 3
@@ -43,7 +45,8 @@ object macro_basics:
    * 
    * Also inline the parameters so they will be fully expanded in the macro.
    */
-  def assertEquals[A](expected: A, actual: A): Unit = ???
+  inline def assertEquals[A](inline expected: A, inline actual: A): Unit =
+    ${assertEqualsImpl('expected, 'actual)}
 
   /**
    * EXERCISE 4
@@ -53,8 +56,18 @@ object macro_basics:
    * of the expressions. You will have to use quotation and splicing, as well as 
    * `Expr#show`.
    */
-  def assertEqualsImpl(expected: Expr[Any], actual: Expr[Any])(using Quotes): Expr[Unit] =
-    ???
+  def assertEqualsImpl(expected: Expr[Any], actual: Expr[Any])(using Quotes): Expr[Unit] = '{
+    val expectedValue = $expected
+    val actualValue = $actual
+    
+    
+    if (expectedValue != actualValue) {
+      println(s"Value of ${${Expr(expected.show)}} is not equal to  ${${Expr(actual.show)}}" )   
+    }
+    
+    
+    
+  }
 
   /**
    * EXERCISE 5
@@ -62,7 +75,10 @@ object macro_basics:
    * Turn the following function into a macro, which delegates to the compile-time 
    * function `inspectTypeImpl`.
    */
-  def inspectType[A]: TypeDetails = ???
+
+  //${assertEqualsImpl('expected, 'actual)}
+  
+  inline def inspectType[A]: TypeDetails = ${inspectTypeImpl}
 
   def inspectTypeImpl[A](using quotes: Quotes, tpe: Type[A]): Expr[TypeDetails] =
     import quotes.reflect.* 
